@@ -1,0 +1,16 @@
+# Python virtual environment
+.venv/
+
+# Model files
+model/
+models/
+
+# Large model weights
+*.bin
+*.pt
+*.pth
+*.gguf
+*.safetensors
+
+# macOS
+.DS_Store
