@@ -1,6 +1,6 @@
 # Python virtual environment
 .venv/
-
+venv/
 # Model files
 model/
 models/
