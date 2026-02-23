@@ -1,121 +1,218 @@
-# Flask Local LLM Server
+# 🧠 Mista Server — Local LLM Flask API
 
-A local LLM server with an OpenAI-compatible REST API, powered by HuggingFace Transformers.
+Run GGUF models locally via `llama.cpp` with a simple OpenAI-compatible REST API.
 
 ---
 
-## Quick Start
+## 📁 Project Structure
 
-### 1. Install dependencies
-```bash
-pip install -r requirements.txt
+```
+mista-server/
+├── app.py
+├── models/
+│   ├── qwen2.5-7b/
+│   │   └── qwen2.5-7b-instruct-q5_k_m.gguf
+│   ├── qwen2.5-3b/
+│   │   └── qwen2.5-3b-instruct-q4_k_m.gguf
+│   └── tinyllama/
+│       └── tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
+└── README.md
 ```
 
-For GPU support (CUDA):
+---
+
+## ⚙️ Requirements
+
 ```bash
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+pip install flask llama-cpp-python
 ```
 
-### 2. Run the server (starts with TinyLlama by default ~1.1GB)
+### Enable Metal GPU (Mac — highly recommended for speed)
+
 ```bash
+pip uninstall llama-cpp-python
+CMAKE_ARGS="-DLLAMA_METAL=on" pip install llama-cpp-python --no-cache-dir
+```
+
+---
+
+## 📥 Downloading Models
+
+### Qwen 2.5 7B (default)
+```bash
+huggingface-cli download Qwen/Qwen2.5-7B-Instruct-GGUF \
+  --include "qwen2.5-7b-instruct-q5_k_m*.gguf" \
+  --local-dir ./models/qwen2.5-7b \
+  --local-dir-use-symlinks False
+```
+
+### Qwen 2.5 3B (faster)
+```bash
+huggingface-cli download Qwen/Qwen2.5-3B-Instruct-GGUF \
+  --include "qwen2.5-3b-instruct-q4_k_m.gguf" \
+  --local-dir ./models/qwen2.5-3b \
+  --local-dir-use-symlinks False
+```
+
+### TinyLlama 1.1B (lightest)
+```bash
+huggingface-cli download TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF \
+  --include "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf" \
+  --local-dir ./models/tinyllama \
+  --local-dir-use-symlinks False
+```
+
+> **Note:** If the model downloads as split files (e.g. `*-00001-of-00002.gguf`), merge them first:
+> ```bash
+> llama-gguf-split --merge qwen2.5-7b-instruct-q5_k_m-00001-of-00002.gguf qwen2.5-7b-instruct-q5_k_m.gguf
+> ```
+> Then delete the split files, keeping only the merged `.gguf`.
+
+---
+
+## 🚀 Running the Server
+
+```bash
+# Default model (qwen2.5-7b)
 python app.py
+
+# Choose a different model
+MODEL=qwen2.5-3b python app.py
+
+# With GPU acceleration
+GPU_LAYERS=35 MODEL=qwen2.5-3b python app.py
 ```
 
-Switch model via environment variable:
-```bash
-MODEL=phi2 python app.py
-```
-
-For gated models (Llama 2/3), set your HuggingFace token:
-```bash
-HF_TOKEN=hf_xxx MODEL=llama3-8b python app.py
-```
+Server runs at: `http://localhost:5001`
 
 ---
 
-## API Endpoints
+## 🌐 API Reference
 
-### Health Check
-```
-GET /health
+### `GET /health`
+Check server and model status.
+
+```bash
+curl http://localhost:5001/health
 ```
 
-### Chat Completions (OpenAI-compatible)
-```
-POST /v1/chat/completions
-Content-Type: application/json
-
+**Response:**
+```json
 {
-  "messages": [
-    {"role": "system", "content": "You are a helpful assistant."},
-    {"role": "user", "content": "What is the capital of France?"}
-  ],
-  "max_tokens": 256,
-  "temperature": 0.7,
-  "stream": false
+  "status": "ok",
+  "model": "qwen2.5-3b",
+  "loaded": true,
+  "ctx": 2048,
+  "threads": 8,
+  "gpu_layers": 35
 }
 ```
 
-### Text Completions
-```
-POST /v1/completions
-Content-Type: application/json
+---
 
-{
-  "prompt": "Once upon a time",
-  "max_tokens": 200,
-  "temperature": 0.8
-}
-```
+### `GET /v1/models`
+List all available models and whether they are downloaded.
 
-### Switch Model at Runtime
-```
-POST /models/switch
-Content-Type: application/json
-
-{ "model": "mistral-7b" }
+```bash
+curl http://localhost:5001/v1/models
 ```
 
 ---
 
-## Available Models
+### `POST /v1/chat/completions`
+Chat with the loaded model.
 
-| Key         | Model                              | Size   | Notes              |
-|-------------|-------------------------------------|--------|--------------------|
-| `tinyllama` | TinyLlama-1.1B-Chat-v1.0           | ~1.1GB | Default, fast      |
-| `phi2`      | microsoft/phi-2                    | ~2.7GB | Great for coding   |
-| `qwen-500m` | Qwen1.5-0.5B-Chat                  | ~0.5GB | Smallest option    |
-| `mistral-7b`| Mistral-7B-Instruct-v0.2           | ~7GB   | Recommended step up|
-| `llama3-8b` | Meta-Llama-3-8B-Instruct           | ~8GB   | Requires HF token  |
-| `llama2-13b`| Llama-2-13b-chat-hf                | ~13GB  | Requires HF token  |
+```bash
+curl -X POST http://localhost:5001/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "What is the capital of France?"}
+    ],
+    "max_tokens": 512,
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "stream": false
+  }'
+```
 
----
+**Streaming:**
+```bash
+curl -X POST http://localhost:5001/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [{"role": "user", "content": "Tell me a joke"}],
+    "stream": true
+  }'
+```
 
-## Example: Using with Python requests
-
+**Python example:**
 ```python
 import requests
 
-response = requests.post("http://localhost:5000/v1/chat/completions", json={
-    "messages": [{"role": "user", "content": "Explain quantum computing briefly"}],
-    "max_tokens": 200,
+res = requests.post("http://localhost:5001/v1/chat/completions", json={
+    "messages": [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "What is the capital of France?"}
+    ],
+    "max_tokens": 256,
     "temperature": 0.7
 })
 
-print(response.json()["choices"][0]["message"]["content"])
+print(res.json()["choices"][0]["message"]["content"])
 ```
 
-## Example: Using with OpenAI SDK (pointing to local server)
+---
 
+### `POST /models/switch`
+Hot-swap the loaded model without restarting the server.
+
+```bash
+curl -X POST http://localhost:5001/models/switch \
+  -H "Content-Type: application/json" \
+  -d '{"model": "qwen2.5-3b"}'
+```
+
+Valid model keys: `qwen2.5-7b`, `qwen2.5-3b`, `tinyllama`
+
+---
+
+## ⚡ Performance Tuning
+
+| Setting | Default | Recommended |
+|--------|---------|-------------|
+| `N_GPU_LAYERS` | `0` | `35` (Mac Metal) |
+| `N_THREADS` | `cpu_count / 2` | `cpu_count` |
+| `N_CTX` | `8192` | `2048` for speed |
+
+Set via environment variables:
+```bash
+GPU_LAYERS=35 MODEL=qwen2.5-3b python app.py
+```
+
+Or edit directly in `app.py`:
 ```python
-from openai import OpenAI
-
-client = OpenAI(base_url="http://localhost:5000/v1", api_key="local")
-
-response = client.chat.completions.create(
-    model="tinyllama",
-    messages=[{"role": "user", "content": "Hello!"}],
-    max_tokens=200,
-)
-print(response.choices[0].message.content)
+N_CTX = 2048
+N_THREADS = os.cpu_count()
+N_GPU_LAYERS = int(os.getenv("GPU_LAYERS", "35"))
 ```
+
+---
+
+## 📬 Postman Setup
+
+1. Create a Collection called `Mista Server`
+2. Add variable: `base_url = http://localhost:5001`
+3. Use `{{base_url}}/health` etc. for all requests
+4. For all POST requests: set **Body → raw → JSON** and header `Content-Type: application/json`
+
+---
+
+## 🛠 Supported Models
+
+| Key | Model | Size | Speed |
+|-----|-------|------|-------|
+| `qwen2.5-7b` | Qwen2.5 7B Instruct Q5 | ~5.5GB | Slow |
+| `qwen2.5-3b` | Qwen2.5 3B Instruct Q4 | ~2GB | Medium |
+| `tinyllama` | TinyLlama 1.1B Q4 | ~0.7GB | Fast |
