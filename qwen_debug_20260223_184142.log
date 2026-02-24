@@ -1,0 +1,11 @@
+2026-02-23 18:41:42,156 | INFO | Starting Qwen2.5-VL test
+2026-02-23 18:41:42,156 | INFO | Model path: ./models/qwen2.5-vl-3b/Qwen2.5-VL-3B-Instruct-Q4_K_M.gguf
+2026-02-23 18:41:42,156 | INFO | MMProj path: ./models/qwen2.5-vl-3b/mmproj-Qwen2.5-VL-3B-Instruct-f16.gguf
+2026-02-23 18:41:42,157 | INFO | Loading model...
+2026-02-23 18:41:46,922 | INFO | Model loaded successfully
+2026-02-23 18:41:46,929 | INFO | Encoding image: test.jpg
+2026-02-23 18:41:46,937 | INFO | Starting inference...
+2026-02-23 18:41:50,840 | INFO | Inference completed successfully
+2026-02-23 18:41:50,875 | INFO | MODEL OUTPUT:
+2026-02-23 18:41:50,876 | INFO | I'm sorry, but I'm unable to see the image you are referring to. Please provide more information or describe the image in detail so that I can assist you better.
+2026-02-23 18:41:50,878 | INFO | Logs saved to: qwen_debug_20260223_184142.log

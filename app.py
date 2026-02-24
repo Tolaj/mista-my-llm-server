@@ -7,6 +7,7 @@ Example:
 
 from flask import Flask, request, jsonify, Response, stream_with_context
 from llama_cpp import Llama
+from llama_cpp.llama_chat_format import Qwen25VLChatHandler
 import threading
 import time
 import os
@@ -26,10 +27,10 @@ MODELS_DIR.mkdir(exist_ok=True)
 MODELS = {
     "qwen2.5-7b": "Qwen2.5-7B-Instruct",
     "qwen2.5-3b": "Qwen2.5-3B-Instruct",
-    "tinyllama": "TinyLlama-1.1B",
+    "qwen2.5-vl-3b": "Qwen2.5-VL-3B-Instruct",  # add this
 }
 
-ACTIVE_MODEL_KEY = os.getenv("MODEL", "qwen2.5-3b")
+ACTIVE_MODEL_KEY = os.getenv("MODEL", "qwen2.5-vl-3b")
 
 llm: Optional[Llama] = None
 model_name = ""
@@ -40,7 +41,7 @@ lock = threading.Lock()
 # Performance tuning
 N_CTX = 8192
 N_THREADS = max(1, os.cpu_count() // 2)
-N_GPU_LAYERS = int(os.getenv("GPU_LAYERS", "35"))
+N_GPU_LAYERS = int(os.getenv("GPU_LAYERS", "36"))
 
 
 # ─────────────────────────────────────────────────────────────
@@ -65,31 +66,74 @@ def find_gguf_file(model_key: str) -> Path:
     return gguf_files[0]
 
 
-def load_model(model_key: str):
+# def load_model(model_key: str):
 
+#     global llm, model_name, model_path
+
+#     gguf_path = find_gguf_file(model_key)
+
+#     print("\n" + "=" * 60)
+#     print(f"Loading model: {model_key}")
+#     print(f"Path: {gguf_path}")
+#     print(f"Context: {N_CTX}")
+#     print(f"Threads: {N_THREADS}")
+#     print(f"GPU layers: {N_GPU_LAYERS}")
+#     print("=" * 60 + "\n")
+
+#     llm = Llama(
+#         model_path=str(gguf_path),
+#         n_ctx=N_CTX,
+#         n_threads=N_THREADS,
+#         n_gpu_layers=N_GPU_LAYERS,
+#         verbose=False,
+#     )
+
+#     model_name = model_key
+#     model_path = str(gguf_path)
+
+#     print(f"✅ Model loaded: {model_key}\n")
+
+
+def load_model(model_key: str):
     global llm, model_name, model_path
 
     gguf_path = find_gguf_file(model_key)
 
+    model_folder = MODELS_DIR / model_key
+    mmproj_files = list(model_folder.glob("mmproj*.gguf"))
+    mmproj_path = str(mmproj_files[0]) if mmproj_files else None
+
     print("\n" + "=" * 60)
     print(f"Loading model: {model_key}")
     print(f"Path: {gguf_path}")
+    print(f"mmproj: {mmproj_path}")
     print(f"Context: {N_CTX}")
     print(f"Threads: {N_THREADS}")
     print(f"GPU layers: {N_GPU_LAYERS}")
     print("=" * 60 + "\n")
 
-    llm = Llama(
-        model_path=str(gguf_path),
-        n_ctx=N_CTX,
-        n_threads=N_THREADS,
-        n_gpu_layers=N_GPU_LAYERS,
-        verbose=False,
-    )
+    if mmproj_path:
+
+        chat_handler = Qwen25VLChatHandler(clip_model_path=mmproj_path)
+        llm = Llama(
+            model_path=str(gguf_path),
+            n_ctx=N_CTX,
+            n_threads=N_THREADS,
+            n_gpu_layers=N_GPU_LAYERS,
+            chat_handler=chat_handler,
+            verbose=False,
+        )
+    else:
+        llm = Llama(
+            model_path=str(gguf_path),
+            n_ctx=N_CTX,
+            n_threads=N_THREADS,
+            n_gpu_layers=N_GPU_LAYERS,
+            verbose=False,
+        )
 
     model_name = model_key
     model_path = str(gguf_path)
-
     print(f"✅ Model loaded: {model_key}\n")
 
 
